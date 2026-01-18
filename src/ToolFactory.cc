@@ -112,28 +112,42 @@ ToolbarItem *ToolFactory::create(const std::string &name, const FbTk::FbWindow &
         item = new SpacerTool(size);
     } else if (name.find("button.") == 0) {
         // A generic button. Needs a label and a command (chain) configured
-        std::string label = FbTk::Resource<std::string>
+        // Let`s make it in One Liner instead adding 2 separated label / command
+        std::string config_line = FbTk::Resource<std::string>
                             (m_screen.resourceManager(), "",
-                             m_screen.name() + ".toolbar." + name + ".label",
-                             m_screen.altName() + ".Toolbar." + name + ".Label");
-        if (label.empty())
+                             m_screen.name() + ".toolbar." + name,
+                             m_screen.altName() + ".Toolbar." + name
+        );
+        if (config_line.empty())
             return 0;
+        //Let`s set the separation , i think i will use : so we can respect fluxbox way
+        size_t colon = config_line.find(':');
+        if (colon == std::string::npos)
+        return 0;
+        std::string cmd_str = config_line.substr(0, colon);
+        std::string label = config_line.substr(colon + 1);
+
+        FbTk::StringUtil::removeTrailingWhitespace(cmd_str);
+        FbTk::StringUtil::removeFirstWhitespace(cmd_str);
+        FbTk::StringUtil::removeTrailingWhitespace(label);
+        FbTk::StringUtil::removeFirstWhitespace(label);
+        if (cmd_str.empty() || label.empty())
+        return 0;
+        
+        // Here Starts The Button Creation
         FbTk::TextButton *btn = new FbTk::TextButton(parent, m_button_theme->font(), label);
         screen().mapToolButton(name, btn);
-
-        std::string cmd_str = FbTk::Resource<std::string>
-                              (m_screen.resourceManager(), "",
-                               m_screen.name() + ".toolbar." + name + ".commands",
-                               m_screen.altName() + ".Toolbar." + name + ".Commands");
+        
+        // Let`s Parse the Command
         std::list<std::string> commands;
         FbTk::StringUtil::stringtok(commands, cmd_str, ":");
         std::list<std::string>::iterator it = commands.begin();
         int i = 1;
         for (; it != commands.end(); ++it, ++i) {
-            std::string cmd_str = *it;
-            FbTk::StringUtil::removeTrailingWhitespace(cmd_str);
-            FbTk::StringUtil::removeFirstWhitespace(cmd_str);
-            FbTk::RefCount<FbTk::Command<void> > cmd(cp.parse(cmd_str));
+            std::string single_cmd = *it;
+            FbTk::StringUtil::removeTrailingWhitespace(single_cmd);
+            FbTk::StringUtil::removeFirstWhitespace(single_cmd);
+            FbTk::RefCount<FbTk::Command<void> > cmd(cp.parse(single_cmd));
             if (cmd)
                 btn->setOnClick(cmd, i);
         }
