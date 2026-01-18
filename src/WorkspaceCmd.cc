@@ -438,8 +438,8 @@ void ArrangeWindowsCmd::execute() {
 
     // if using stacked-left/right/top/bottom and we don't have a main window yet
     // (no focused window?), we'll fall back on using the last window in the
-    // window list.
-    if (main_window == NULL && (m_tile_method >= STACKLEFT)) {
+    // window list. To fix warning on build we should add a check 
+    if (main_window == NULL && (m_tile_method >= STACKLEFT) && !normal_windows.empty()) {
         main_window = normal_windows.back();
         normal_windows.pop_back();
     }
