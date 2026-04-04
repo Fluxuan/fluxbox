@@ -24,7 +24,8 @@
 #include "FbTk/Button.hh"
 #include "FbTk/ImageControl.hh"
 #include "FbTk/TextButton.hh"
-
+#include "FbTk/App.hh"          // for App::instance()
+#include <X11/extensions/shape.h>  // for XShapeCombineMask / ShapeBounding / ShapeSet
 ButtonTool::ButtonTool(FbTk::Button *button, 
                        ToolbarItem::Type type, 
                        FbTk::ThemeProxy<ButtonTheme> &theme,
@@ -42,10 +43,10 @@ ButtonTool::~ButtonTool() {
 
     if (m_cache_pressed_pm)
         m_image_ctrl.removeImage(m_cache_pressed_pm);
-
 }
 
 void ButtonTool::updateSizing() {
+    
     FbTk::Button &btn = static_cast<FbTk::Button &>(window());
     int bw = theme()->border().width();
     btn.setBorderWidth(bw);
@@ -63,46 +64,64 @@ void ButtonTool::updateSizing() {
 	}
 }
 
+
+
 void ButtonTool::renderTheme(int alpha) {
     FbTk::Button &btn = static_cast<FbTk::Button &>(window());
-
     btn.setGC(static_cast<const ButtonTheme &>(*theme()).gc());
     btn.setBorderColor(theme()->border().color());
     btn.setBorderWidth(theme()->border().width());
     btn.setAlpha(alpha);
     btn.updateTheme(*theme());
-
-    Pixmap old_pm = m_cache_pm;
-    if (!theme()->texture().usePixmap()) {
-        m_cache_pm = 0;
-        btn.setBackgroundColor(theme()->texture().color());
+    
+    /* ------- background ------- */
+    if (m_hands_off_bg || m_has_user_pixmap) {
+        if (m_has_user_pixmap && m_user_pixmap.pixmap().drawable()) {
+            // Simple: just use the pixmap as-is, let it fill/tile
+            btn.setBackgroundPixmap(m_user_pixmap.pixmap().drawable());
+            
+            // Apply mask for transparency if available
+            if (m_user_pixmap.mask().drawable()) {
+                XShapeCombineMask(FbTk::App::instance()->display(),
+                                 btn.window(),
+                                 ShapeBounding,
+                                 0, 0,
+                                 m_user_pixmap.mask().drawable(),
+                                 ShapeSet);
+            }
+        }
+        // else keep existing background
     } else {
-        m_cache_pm = m_image_ctrl.renderImage(width(), height(),
-                                              theme()->texture(), orientation());
-        btn.setBackgroundPixmap(m_cache_pm);
+        Pixmap old_pm = m_cache_pm;
+        if (!theme()->texture().usePixmap()) {
+            m_cache_pm = 0;
+            btn.setBackgroundColor(theme()->texture().color());
+        } else {
+            m_cache_pm = m_image_ctrl.renderImage(width(), height(),
+                                                  theme()->texture(), orientation());
+            btn.setBackgroundPixmap(m_cache_pm);
+        }
+        if (old_pm) m_image_ctrl.removeImage(old_pm);
     }
-    if (old_pm)
-        m_image_ctrl.removeImage(old_pm);
 
-    old_pm = m_cache_pressed_pm;
-    if (! static_cast<const ButtonTheme &>(*theme()).pressed().usePixmap()) {
+    /* ------- pressed ------- */
+    Pixmap old_press = m_cache_pressed_pm;
+    if (!static_cast<const ButtonTheme &>(*theme()).pressed().usePixmap()) {
         m_cache_pressed_pm = 0;
         btn.setPressedColor(static_cast<const ButtonTheme &>(*theme()).pressed().color());
     } else {
-        m_cache_pressed_pm = m_image_ctrl.renderImage(width(), height(),
-                                                      static_cast<const ButtonTheme &>(*theme()).pressed(), orientation());
+        m_cache_pressed_pm =
+            m_image_ctrl.renderImage(width(), height(),
+                                     static_cast<const ButtonTheme &>(*theme()).pressed(),
+                                     orientation());
         btn.setPressedPixmap(m_cache_pressed_pm);
     }
-
-    if (old_pm)
-        m_image_ctrl.removeImage(old_pm);
+    if (old_press) m_image_ctrl.removeImage(old_press);
 
     btn.clear();
 }
-
 void ButtonTool::setOrientation(FbTk::Orientation orient) {
     FbTk::Button &btn = static_cast<FbTk::Button &>(window());
     btn.setOrientation(orient);
     ToolbarItem::setOrientation(orient);
 }
-
