@@ -2,9 +2,16 @@ Fluxuan Linux Fluxbox
 For now , cleaned some compiling warnings and modified text button from multiple lines to one line 
 
 Example:
-Create a TEXT BUTTON in init file
+
+Create a TEXT BUTTON or ICON BUTTON in init file
+
 session.screen0.toolbar.button.firefox: exec firefox : WWW 
-// where -> button.firefox (Button Name) / exec firefox (Command to execute) / :  / WWW (Button Label)
+session.screen0.toolbar.button.firefox: exec firefox : /usr/share/icons/my-icon.png
+
+// where -> button.firefox (Button Name) / exec firefox (Command to execute) / :  / WWW (Button Label) /// or icon location
+
+!!!! For now icons are not resizing so if toolbar height is 24 then use a icon that is from the 24 pixel folder and so on !!!!
+
 Add to Toolbar Example :
 session.screen0.toolbar.tools: button.firefox, iconbar, systemtray, clock
 
