@@ -42,6 +42,11 @@
 #include "ScreenPlacement.hh"
 #include "Toolbar.hh"
 #include "fluxbox.hh"
+#include "FbTk/Image.hh"
+#include "FbTk/PixmapWithMask.hh"
+#include "FbTk/Button.hh"
+#include "FbTk/StringUtil.hh"
+#include "FbTk/ImageControl.hh" 
 
 namespace {
 class ShowMenuAboveToolbar: public FbTk::Command<void> {
@@ -110,50 +115,103 @@ ToolbarItem *ToolFactory::create(const std::string &name, const FbTk::FbWindow &
                 return 0;
         }
         item = new SpacerTool(size);
-    } else if (name.find("button.") == 0) {
-        // A generic button. Needs a label and a command (chain) configured
-        // Let`s make it in One Liner instead adding 2 separated label / command
-        std::string config_line = FbTk::Resource<std::string>
-                            (m_screen.resourceManager(), "",
-                             m_screen.name() + ".toolbar." + name,
-                             m_screen.altName() + ".Toolbar." + name
+        
+    } else if (name.find("button.icon.") == 0) {
+        std::string iconline = FbTk::Resource<std::string>(
+            m_screen.resourceManager(), "",
+            m_screen.name() + ".toolbar." + name,
+            m_screen.altName() + ".Toolbar." + name
         );
-        if (config_line.empty())
-            return 0;
-        //Let`s set the separation , i think i will use : so we can respect fluxbox way
-        size_t colon = config_line.find(':');
-        if (colon == std::string::npos)
-        return 0;
-        std::string cmd_str = config_line.substr(0, colon);
-        std::string label = config_line.substr(colon + 1);
+
+        if (iconline.empty()) return 0;
+
+        size_t colon = iconline.find(':');
+        if (colon == std::string::npos) return 0;
+
+        std::string cmd_str = iconline.substr(0, colon);
+        std::string icon_path = iconline.substr(colon + 1);
 
         FbTk::StringUtil::removeTrailingWhitespace(cmd_str);
         FbTk::StringUtil::removeFirstWhitespace(cmd_str);
-        FbTk::StringUtil::removeTrailingWhitespace(label);
-        FbTk::StringUtil::removeFirstWhitespace(label);
-        if (cmd_str.empty() || label.empty())
-        return 0;
-        
-        // Here Starts The Button Creation
-        FbTk::TextButton *btn = new FbTk::TextButton(parent, m_button_theme->font(), label);
-        screen().mapToolButton(name, btn);
-        
-        // Let`s Parse the Command
-        std::list<std::string> commands;
-        FbTk::StringUtil::stringtok(commands, cmd_str, ":");
-        std::list<std::string>::iterator it = commands.begin();
-        int i = 1;
-        for (; it != commands.end(); ++it, ++i) {
-            std::string single_cmd = *it;
-            FbTk::StringUtil::removeTrailingWhitespace(single_cmd);
-            FbTk::StringUtil::removeFirstWhitespace(single_cmd);
-            FbTk::RefCount<FbTk::Command<void> > cmd(cp.parse(single_cmd));
-            if (cmd)
-                btn->setOnClick(cmd, i);
+        FbTk::StringUtil::removeTrailingWhitespace(icon_path);
+        FbTk::StringUtil::removeFirstWhitespace(icon_path);
+
+        if (cmd_str.empty() || icon_path.empty()) return 0;
+
+        // Load icon using Fluxbox image system
+        FbTk::PixmapWithMask *pm_ptr = FbTk::Image::load(icon_path, m_screen.screenNumber());
+        if (!pm_ptr || !pm_ptr->pixmap().drawable()) {
+            delete pm_ptr;
+            return 0;
         }
-        item = new ButtonTool(btn, ToolbarItem::FIXED,
-                              dynamic_cast<ButtonTheme &>(*m_button_theme),
-                              screen().imageControl());
+
+        // Create button
+        FbTk::Button *btn = new FbTk::Button(parent, 0, 0, button_size, button_size);
+        
+        // Bind command
+        FbTk::RefCount<FbTk::Command<void> > cmd(cp.parse(cmd_str));
+        if (cmd) btn->setOnClick(cmd);
+
+        ButtonTool *bt = new ButtonTool(btn, ToolbarItem::SQUARE,
+                                        dynamic_cast<ButtonTheme &>(*m_button_theme),
+                                        screen().imageControl());
+        
+        // Set the user pixmap (makes a copy)
+        bt->setUserPixmap(*pm_ptr);
+        
+        // Clean up temporary
+        delete pm_ptr;
+        
+        item = bt;
+
+} else if (name.find("button.") == 0) {
+    // Single line format: command:label
+    std::string config_line = FbTk::Resource<std::string>(
+        m_screen.resourceManager(), "",
+        m_screen.name() + ".toolbar." + name,
+        m_screen.altName() + ".Toolbar." + name
+    );
+
+    if (config_line.empty())
+        return 0;
+
+    size_t colon = config_line.find(':');
+    if (colon == std::string::npos)
+        return 0;
+
+    std::string cmd_str = config_line.substr(0, colon);
+    std::string label = config_line.substr(colon + 1);
+
+    FbTk::StringUtil::removeTrailingWhitespace(cmd_str);
+    FbTk::StringUtil::removeFirstWhitespace(cmd_str);
+    FbTk::StringUtil::removeTrailingWhitespace(label);
+    FbTk::StringUtil::removeFirstWhitespace(label);
+
+    if (cmd_str.empty() || label.empty())
+        return 0;
+
+    // Create text button with label
+    FbTk::TextButton *btn = new FbTk::TextButton(parent, m_button_theme->font(), label);
+    screen().mapToolButton(name, btn);
+
+    // Parse commands (could be multiple separated by colons)
+    std::list<std::string> commands;
+    FbTk::StringUtil::stringtok(commands, cmd_str, ":");
+    std::list<std::string>::iterator it = commands.begin();
+    int i = 1;
+    for (; it != commands.end(); ++it, ++i) {
+        std::string single_cmd = *it;
+        FbTk::StringUtil::removeTrailingWhitespace(single_cmd);
+        FbTk::StringUtil::removeFirstWhitespace(single_cmd);
+        FbTk::RefCount<FbTk::Command<void> > cmd(cp.parse(single_cmd));
+        if (cmd)
+            btn->setOnClick(cmd, i);
+    }
+    
+    item = new ButtonTool(btn, ToolbarItem::FIXED,
+                          dynamic_cast<ButtonTheme &>(*m_button_theme),
+                          screen().imageControl());
+    
     } else {
         std::string cmd_str = name;
         if (name == "prevwindow" || name == "nextwindow") {
@@ -203,4 +261,3 @@ int ToolFactory::maxFontHeight() {
 
     return max_height;
 }
-
