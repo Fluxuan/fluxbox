@@ -23,7 +23,7 @@
 #define BUTTONTOOL_HH
 
 #include "GenericTool.hh"
-
+#include "FbTk/PixmapWithMask.hh"
 #include <X11/Xlib.h>
 
 class ButtonTheme;
@@ -40,10 +40,17 @@ public:
                FbTk::ImageControl &img_ctrl);
     virtual ~ButtonTool();
     void setOrientation(FbTk::Orientation orient);
-
+    void setHandsOffBackground(bool y) { m_hands_off_bg = y; }
+    void setUserPixmap(const FbTk::PixmapWithMask &pm) {
+        m_user_pixmap = pm;  // Copy the pixmap
+        m_has_user_pixmap = true;
+    }
 protected:
     void renderTheme(int alpha);
     void updateSizing();
+    bool m_hands_off_bg = false;
+    bool m_has_user_pixmap = false;
+    FbTk::PixmapWithMask m_user_pixmap;  // Store a copy
     Pixmap m_cache_pm, m_cache_pressed_pm;
     FbTk::ImageControl &m_image_ctrl;
 };
