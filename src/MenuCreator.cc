@@ -497,7 +497,8 @@ FbMenu* MenuCreator::createMenu(const std::string& label, BScreen& screen) {
     FbMenu *menu = new FbMenu(screen.menuTheme(), screen.imageControl(), *layer);
     if (!label.empty())
         menu->setLabel(label);
-
+        else
+        menu->disableTitle();
     return menu;
 }
 
